@@ -3,6 +3,25 @@ import requests
 from bs4 import BeautifulSoup
 import asyncio
 from telegram import Bot
+from flask import Flask
+from threading import Thread
+import os
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot de Zara en funcionamiento"
+
+def run():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# Llama a esta función justo antes de que empiece el bucle de tu bot
+keep_alive()
 
 # —————————————————
 # 🔧 CONFIGURACIÓN
@@ -102,4 +121,5 @@ async def main():
         await asyncio.sleep(CHECK_INTERVAL_SEC)
 
 if __name__ == "__main__":
+
     asyncio.run(main())
