@@ -29,7 +29,7 @@ def keep_alive():
 # —————————————————
 # 🔧 CONFIGURACIÓN
 # —————————————————
-ZARA_PRODUCT_URL = "https://www.zara.com/es/es/blazer-espiga-con-lana-zw-collection-p03736258.html?v1=498638852"
+ZARA_PRODUCT_URL = "https://www.zara.com/es/es/camiseta-heavyweight-manga-corta-p00761323.html?v1=503419580&v2=2475861"
 CHECK_INTERVAL_SEC = 60 
 
 TELEGRAM_TOKEN = "8034310833:AAEsybSNGhPEnAbz0YIzvkOQUN2WSTUZK-0"
@@ -119,4 +119,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Bot detenido manualmente.")
+
 
