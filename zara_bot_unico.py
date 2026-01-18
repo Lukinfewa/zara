@@ -7,37 +7,35 @@ from flask import Flask
 from threading import Thread
 import os
 
+# —————————————————
+# 🌐 SERVIDOR PARA RENDER (KEEP ALIVE)
+# —————————————————
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot de Zara en funcionamiento"
+    return "Bot de Zara en funcionamiento 24/7"
 
 def run():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    # Render usa la variable de entorno PORT, si no existe usa el 8080
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
     t = Thread(target=run)
+    t.daemon = True  # Esto permite que el hilo se cierre si el programa principal muere
     t.start()
-
-# Llama a esta función justo antes de que empiece el bucle de tu bot
-keep_alive()
 
 # —————————————————
 # 🔧 CONFIGURACIÓN
 # —————————————————
 ZARA_PRODUCT_URL = "https://www.zara.com/es/es/blazer-espiga-con-lana-zw-collection-p03736258.html?v1=498638852"
-
-# Aumentado a 60 seg para evitar que Zara te bloquee por exceso de peticiones
 CHECK_INTERVAL_SEC = 60 
 
-# Datos de Telegram
 TELEGRAM_TOKEN = "8034310833:AAEsybSNGhPEnAbz0YIzvkOQUN2WSTUZK-0"
 CHAT_IDS = [5013787175, 7405905501]
 
 bot = Bot(token=TELEGRAM_TOKEN)
-
-# Tallas que te interesan
 TALLAS_DESEADAS = ["XS", "S", "M"]
 
 # —————————————————
@@ -62,33 +60,24 @@ def esta_disponible():
         res = requests.get(ZARA_PRODUCT_URL, headers=headers, timeout=15)
         if res.status_code != 200:
             print(f"⚠️ Error {res.status_code}: Posible bloqueo de Zara.")
-            return False
+            return False, []
         
         soup = BeautifulSoup(res.text, "html.parser")
-        
-        # Buscamos todos los elementos que parecen ser tallas
-        # Zara suele poner las tallas en etiquetas con una clase específica
         items_talla = soup.find_all("div", {"class": "product-detail-size-selector-product-size-info"})
         
         tallas_encontradas = []
-        
         for item in items_talla:
             nombre_talla = item.get_text(strip=True).upper()
-            
-            # Verificamos si la talla es una de las que quieres
             if nombre_talla in TALLAS_DESEADAS:
-                # Comprobamos si el elemento padre o el mismo tiene la clase de 'out-of-stock'
-                # Normalmente, si no es seleccionable, tiene un atributo 'disabled' o clase específica
                 clases_padre = str(item.parent.get("class", ""))
-                
                 if "out-of-stock" not in clases_padre.lower() and "disabled" not in clases_padre.lower():
                     tallas_encontradas.append(nombre_talla)
 
         if tallas_encontradas:
-            print(f"✨ STOCK DETECTADO en tallas: {', '.join(tallas_encontradas)}")
+            print(f"✨ STOCK DETECTADO: {', '.join(tallas_encontradas)}")
             return True, tallas_encontradas
         else:
-            print(f"📦 ESTADO: S, M y L agotadas.")
+            print(f"📦 ESTADO: {', '.join(TALLAS_DESEADAS)} agotadas.")
             return False, []
             
     except Exception as e:
@@ -100,8 +89,9 @@ def esta_disponible():
 # —————————————————
 
 async def main():
-    print(f"🚀 Bot iniciado. Vigilando S, M, L para {len(CHAT_IDS)} usuarios...")
-    await enviar_mensaje_a_todos("🔔 Bot actualizado: Ahora solo os avisaré si hay stock real de las tallas xS, S o M.")
+    print(f"🚀 Bot iniciado. Vigilando {TALLAS_DESEADAS}...")
+    # Notificación de inicio
+    await enviar_mensaje_a_todos("✅ Bot ONLINE en la nube. Vigilando stock de Zara 24/7.")
 
     disponible_previo = False
 
@@ -121,5 +111,12 @@ async def main():
         await asyncio.sleep(CHECK_INTERVAL_SEC)
 
 if __name__ == "__main__":
+    # 1. Encendemos el servidor web para Render
+    keep_alive()
+    
+    # 2. Encendemos el bot de Telegram
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot detenido manualmente.")
 
-    asyncio.run(main())
