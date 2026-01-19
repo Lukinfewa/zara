@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: zara-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python zara_bot_unico.py
+    envVars:
+      - key: GOOGLE_CHROME_BIN
+        value: /app/.apt/usr/bin/google-chrome
+      - key: CHROMEDRIVER_PATH
+        value: /app/.chromedriver/bin/chromedriver
+    buildpacks:
+      - url: https://github.com/heroku/heroku-buildpack-google-chrome
+      - url: https://github.com/heroku/heroku-buildpack-chromedriver
