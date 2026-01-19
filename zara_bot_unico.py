@@ -1,32 +1,49 @@
 import os
 import time
 import requests
+import logging
 from flask import Flask
 from telegram import Bot
 from threading import Thread
 from dotenv import load_dotenv
 
-# ---------------- FLASK ----------------
-app = Flask('')
+# ================= LOGGING =================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    force=True
+)
 
-@app.route('/')
+# ================= FLASK =================
+app = Flask(__name__)
+
+@app.route("/")
 def home():
     return "Bot Zara Online ✅"
 
 def run_flask():
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get("PORT", 8080))
+    logging.info(f"🌐 Flask escuchando en puerto {port}")
+    app.run(host="0.0.0.0", port=port)
 
-# ---------------- CONFIG ----------------
+# ================= CONFIG =================
 load_dotenv()
 
 PRODUCT_URL = "https://www.zara.com/es/es/blazer-espiga-con-lana-zw-collection-p03736258.html"
 API_URL = "https://www.zara.com/es/es/products-details?productId=3736258"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_IDS_RAW = os.getenv("CHAT_IDS", "")
 
-CHAT_IDS = os.getenv("CHAT_IDS", "")
-CHAT_IDS = [int(x) for x in CHAT_IDS.split(',') if x.strip()]
+if not TELEGRAM_TOKEN:
+    logging.error("❌ TELEGRAM_TOKEN no definido")
+    raise ValueError("Falta TELEGRAM_TOKEN")
+
+CHAT_IDS = [int(cid.strip()) for cid in CHAT_IDS_RAW.split(",") if cid.strip()]
+
+if not CHAT_IDS:
+    logging.error("❌ CHAT_IDS vacío o mal definido")
+    raise ValueError("CHAT_IDS incorrecto")
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
@@ -36,14 +53,14 @@ HEADERS = {
     "Accept-Language": "es-ES"
 }
 
-# ---------------- STOCK CHECK ----------------
+# ================= STOCK CHECK =================
 def hay_stock():
     try:
-        print(f"[{time.strftime('%H:%M:%S')}] 🔍 Consultando stock Zara...")
+        logging.info("🔍 Consultando stock Zara...")
         r = requests.get(API_URL, headers=HEADERS, timeout=10)
 
         if r.status_code != 200:
-            print(f"❌ Error {r.status_code}")
+            logging.warning(f"⚠️ Respuesta Zara: {r.status_code}")
             return False
 
         data = r.json()
@@ -53,23 +70,31 @@ def hay_stock():
             for size in color.get("sizes", []):
                 if size.get("availability") == "in_stock":
                     talla = size.get("name", "Talla")
-                    print(f"✅ STOCK: {color_name} - {talla}")
+                    logging.info(f"✅ STOCK DETECTADO: {color_name} - {talla}")
                     return True
 
-        print("❌ Sin stock")
+        logging.info("❌ Sin stock")
         return False
 
     except Exception as e:
-        print(f"💥 Error stock: {e}")
+        logging.error(f"💥 Error comprobando stock: {e}")
         return False
 
-# ---------------- MAIN LOOP ----------------
+# ================= MAIN LOOP =================
 def main():
-    print("🚀 Bot Zara iniciado")
-    print(f"🔗 {PRODUCT_URL}")
+    logging.info("🚀 Bot Zara iniciado")
+    logging.info(f"🔗 Producto: {PRODUCT_URL}")
 
     for cid in CHAT_IDS:
-        bot.send_message(cid, "🤖 Bot Zara iniciado\nBuscando stock cada 60s")
+        try:
+            bot.send_message(
+                cid,
+                "🤖 Bot Zara iniciado\nBuscando stock cada 60 segundos"
+            )
+        except Exception as e:
+            logging.error(f"❌ Error enviando mensaje inicial a {cid}: {e}")
+
+    logging.info("🟢 Entrando en el bucle principal")
 
     while True:
         try:
@@ -80,24 +105,21 @@ def main():
                     f"🕒 {time.strftime('%H:%M:%S')}"
                 )
 
-                print("📨 Enviando alerta Telegram")
+                logging.info("📨 Enviando alerta por Telegram")
                 for cid in CHAT_IDS:
                     bot.send_message(cid, mensaje)
                     time.sleep(1)
 
-                # Esperar 5 minutos tras detectar stock
+                logging.info("⏳ Esperando 5 minutos tras detección de stock")
                 time.sleep(300)
             else:
                 time.sleep(60)
 
         except Exception as e:
-            print(f"💥 Error bucle: {e}")
+            logging.error(f"💥 Error en bucle principal: {e}")
             time.sleep(30)
 
-# ---------------- START ----------------
+# ================= START =================
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
-    print("🌐 Flask activo")
     main()
-
-
