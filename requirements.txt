@@ -1,4 +1,6 @@
-requests
-beautifulsoup4
-python-telegram-bot
 flask
+requests
+selenium
+webdriver-manager
+python-telegram-bot
+asyncio
