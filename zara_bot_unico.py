@@ -47,31 +47,47 @@ def configurar_driver():
 
 def buscar_stock_selenium(driver):
     try:
-        print(f"[{time.strftime('%H:%M:%S')}] 🔍 Entrando en Zara para revisar stock...", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] 🔍 Iniciando búsqueda...", flush=True)
         driver.get(ZARA_URL)
-        time.sleep(8) 
-        
-        ul_element = driver.find_element(By.CSS_SELECTOR, 'ul.size-selector-sizes.size-selector-sizes--grid-gap')
-        li_elements = ul_element.find_elements(By.TAG_NAME, 'li')
-        
+        time.sleep(10) # Aumentamos a 10 seg para asegurar carga total
+
+        # --- NUEVO: Intentar cerrar banner de cookies si aparece ---
+        try:
+            cookie_btn = driver.find_element(By.ID, "onetrust-accept-btn-handler")
+            cookie_btn.click()
+            time.sleep(2)
+        except:
+            pass # Si no hay banner, seguimos
+
+        # --- NUEVO: Selector más robusto ---
+        # Buscamos cualquier li que contenga el texto de la talla dentro de la zona de tallas
         encontradas = []
-        for el in li_elements:
+        elementos_talla = driver.find_elements(By.CSS_SELECTOR, 'li[class*="size-selector"]')
+        
+        if not elementos_talla:
+            # Intento alternativo si el anterior falla
+            elementos_talla = driver.find_elements(By.CSS_SELECTOR, 'div[data-qa-qualifier="size-list-item"]')
+
+        for el in elementos_talla:
             texto = el.text.strip().upper()
             clase = el.get_attribute('class').lower()
             
-            if texto in TALLAS_Deseadas and "unavailable" not in clase:
-                encontradas.append(texto)
+            # Filtramos por nuestras tallas y verificamos que no sea 'unavailable'
+            for t in TALLAS_Deseadas:
+                if t == texto and "unavailable" not in clase and "out-of-stock" not in clase:
+                    encontradas.append(t)
         
         if encontradas:
-            print(f"[{time.strftime('%H:%M:%S')}] ✅ ¡STOCK DETECTADO!: {encontradas}", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] ✅ ¡STOCK!: {encontradas}", flush=True)
         else:
-            print(f"[{time.strftime('%H:%M:%S')}] ❌ Sin stock de las tallas deseadas.", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] ❌ Sin stock en este ciclo.", flush=True)
             
         return list(set(encontradas))
-    except Exception as e:
-        print(f"[{time.strftime('%H:%M:%S')}] ⚠️ Error en la búsqueda: {e}", flush=True)
-        return []
 
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] ⚠️ Error: No se encontró el panel de tallas. Reintentando...", flush=True)
+        return []
+        
 async def main():
     # Aviso de inicio
     for cid in IDS:
@@ -93,7 +109,20 @@ async def main():
         await asyncio.sleep(60)
         driver.refresh()
 
+except Exception as e:
+        print(f"💥 ERROR FATAL: {e}", flush=True)
+        for cid in IDS:
+            try:
+                # Usamos un mensaje sencillo para evitar errores en el propio aviso
+                await bot.send_message(chat_id=cid, text=f"⚠️ El bot se ha detenido por un problema técnico:\n{str(e)[:100]}")
+            except:
+                pass
+    finally:
+        # Esto asegura que el navegador se cierre si el bot muere
+        driver.quit()
+
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     asyncio.run(main())
+
 
