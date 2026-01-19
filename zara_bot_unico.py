@@ -8,12 +8,14 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 1. SERVIDOR FLASK (Para que Render no apague el bot) ---
+# --- 1. SERVIDOR FLASK ---
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Zara Online ✅"
+def home(): return "Bot Zara (Solo Añadir) Online ✅"
 
 def run_flask():
     port = int(os.environ.get('PORT', 8080))
@@ -23,7 +25,6 @@ def run_flask():
 ZARA_URL = "https://www.zara.com/es/es/blazer-espiga-con-lana-zw-collection-p03736258.html?v1=498638852"
 TOKEN = "8034310833:AAEsybSNGhPEnAbz0YIzvkOQUN2WSTUZK-0"
 IDS = [5013787175, 7405905501]
-TALLAS_Deseadas = ["XS", "S", "M"]
 
 bot = Bot(token=TOKEN)
 
@@ -32,9 +33,9 @@ def configurar_driver():
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
     options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # Ruta de Chrome para Render
     chrome_bin = os.environ.get("GOOGLE_CHROME_BIN")
     if chrome_bin:
         options.binary_location = chrome_bin
@@ -45,76 +46,59 @@ def configurar_driver():
         service = ChromeService(ChromeDriverManager().install())
         return webdriver.Chrome(service=service, options=options)
 
-def buscar_stock_selenium(driver):
+def comprobar_boton_añadir(driver):
     try:
-        print(f"[{time.strftime('%H:%M:%S')}] 🔍 Iniciando búsqueda en Zara...", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] 🔍 Comprobando botón AÑADIR...", flush=True)
         driver.get(ZARA_URL)
-        time.sleep(10) # Tiempo para carga de JavaScript
-
-        # Intentar cerrar cookies para limpiar la vista
-        try:
-            driver.find_element(By.ID, "onetrust-accept-btn-handler").click()
-            time.sleep(1)
-        except: pass
-
-        encontradas = []
-        # Selectores múltiples para mayor fiabilidad
-        elementos = driver.find_elements(By.CSS_SELECTOR, 'li[class*="size-selector"]')
-        if not elementos:
-            elementos = driver.find_elements(By.CSS_SELECTOR, 'div[data-qa-qualifier="size-list-item"]')
-
-        for el in elementos:
-            texto = el.text.strip().upper()
-            clase = el.get_attribute('class').lower()
-            
-            if texto in TALLAS_Deseadas:
-                # Comprobamos que no esté marcado como no disponible
-                if "unavailable" not in clase and "out-of-stock" not in clase:
-                    encontradas.append(texto)
         
-        if encontradas:
-            print(f"[{time.strftime('%H:%M:%S')}] ✅ STOCK DETECTADO: {encontradas}", flush=True)
+        # Esperamos a que el botón aparezca en el código
+        # Usamos el selector exacto de tu captura: data-qa-action="open-size-selector"
+        boton = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'button[data-qa-action="open-size-selector"]'))
+        )
+        
+        # Verificamos si el botón está deshabilitado o si el texto es distinto
+        esta_deshabilitado = boton.get_attribute("disabled")
+        texto_boton = boton.text.strip().upper()
+        
+        # Si el botón existe y no está deshabilitado, asumimos que hay algo de stock
+        if not esta_deshabilitado and "AÑADIR" in texto_boton:
+            print(f"[{time.strftime('%H:%M:%S')}] ✅ ¡BOTÓN AÑADIR ACTIVO!", flush=True)
+            return True
         else:
-            print(f"[{time.strftime('%H:%M:%S')}] ❌ Sin stock en este ciclo.", flush=True)
-            
-        return list(set(encontradas))
+            print(f"[{time.strftime('%H:%M:%S')}] ❌ Botón no disponible o agotado.", flush=True)
+            return False
+
     except Exception as e:
-        print(f"[{time.strftime('%H:%M:%S')}] ⚠️ Error en búsqueda: {e}", flush=True)
-        return []
+        print(f"[{time.strftime('%H:%M:%S')}] ⚠️ No se ve el botón AÑADIR: {str(e)[:50]}", flush=True)
+        return False
 
 async def main():
-    # Mensaje de arranque en Telegram
     for cid in IDS:
-        try: await bot.send_message(chat_id=cid, text="🚀 Bot Online: Monitorizando Zara (XS, S, M)...")
+        try: await bot.send_message(chat_id=cid, text="🚀 Bot Online: Vigilando botón 'AÑADIR'...")
         except: pass
 
     driver = configurar_driver()
 
     try:
         while True:
-            stock = buscar_stock_selenium(driver)
+            hay_stock = comprobar_boton_añadir(driver)
             
-            if stock:
-                msg = f"✨ ¡HAY STOCK! Tallas: {', '.join(stock)}\n{ZARA_URL}"
+            if hay_stock:
+                msg = f"✨ ¡DISPONIBLE! El botón de AÑADIR ya aparece activo.\n{ZARA_URL}"
                 for cid in IDS:
                     try: await bot.send_message(chat_id=cid, text=msg)
                     except: pass
-                # Pausa larga de 10 min si hay stock para evitar spam
-                await asyncio.sleep(600) 
+                # Pausa de 10 min para no spamear si ya sabemos que hay stock
+                await asyncio.sleep(600)
             
-            print(f"[{time.strftime('%H:%M:%S')}] ⏳ Pausa de 2 min hasta el próximo intento...", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] ⏳ Pausa de 2 min...", flush=True)
             await asyncio.sleep(120)
             driver.refresh()
 
     except Exception as e:
-        # --- BLOQUE DE SEGURIDAD: AVISO POR TELEGRAM SI EL BOT MUERE ---
-        error_msg = f"⚠️ El bot se ha detenido por un problema técnico:\n{str(e)[:150]}"
-        print(f"💥 ERROR FATAL: {error_msg}", flush=True)
-        for cid in IDS:
-            try: await bot.send_message(chat_id=cid, text=error_msg)
-            except: pass
+        print(f"💥 Error fatal: {e}", flush=True)
     finally:
-        # Asegura que el navegador se cierre al terminar
         driver.quit()
 
 if __name__ == "__main__":
