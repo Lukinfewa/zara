@@ -58,9 +58,22 @@ HEADERS = {
 
 # ================= STOCK CHECK =================
 def hay_stock():
-    try:
-        logging.info("🔍 Consultando stock Zara...")
-        r = requests.get(API_URL, headers=HEADERS, timeout=10)
+            try:
+                logging.info("🔍 Consultando stock Zara...")
+               ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
+        
+        proxies = {
+            "http": f"http://apikey:{ZYTE_API_KEY}@proxy.zyte.com:8011",
+            "https": f"http://apikey:{ZYTE_API_KEY}@proxy.zyte.com:8011",
+        }
+        
+        r = requests.get(
+            API_URL,
+            headers=HEADERS,
+            proxies=proxies,
+            timeout=20
+        )
+
 
         if r.status_code != 200:
             logging.warning(f"⚠️ Respuesta Zara: {r.status_code}")
@@ -126,4 +139,5 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
