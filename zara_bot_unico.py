@@ -48,9 +48,12 @@ if not CHAT_IDS:
 bot = Bot(token=TELEGRAM_TOKEN)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0",
-    "Accept": "application/json",
-    "Accept-Language": "es-ES"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "es-ES,es;q=0.9",
+    "Referer": "https://www.zara.com/es/",
+    "Connection": "keep-alive"
 }
 
 # ================= STOCK CHECK =================
@@ -123,3 +126,4 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
