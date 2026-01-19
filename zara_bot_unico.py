@@ -47,10 +47,10 @@ def configurar_driver():
 
 def buscar_stock_selenium(driver):
     try:
+        print(f"[{time.strftime('%H:%M:%S')}] 🔍 Entrando en Zara para revisar stock...", flush=True)
         driver.get(ZARA_URL)
-        time.sleep(8) # Espera para carga dinámica de Zara
+        time.sleep(8) 
         
-        # Localizamos el contenedor de tallas según tu código original
         ul_element = driver.find_element(By.CSS_SELECTOR, 'ul.size-selector-sizes.size-selector-sizes--grid-gap')
         li_elements = ul_element.find_elements(By.TAG_NAME, 'li')
         
@@ -62,9 +62,14 @@ def buscar_stock_selenium(driver):
             if texto in TALLAS_Deseadas and "unavailable" not in clase:
                 encontradas.append(texto)
         
+        if encontradas:
+            print(f"[{time.strftime('%H:%M:%S')}] ✅ ¡STOCK DETECTADO!: {encontradas}", flush=True)
+        else:
+            print(f"[{time.strftime('%H:%M:%S')}] ❌ Sin stock de las tallas deseadas.", flush=True)
+            
         return list(set(encontradas))
     except Exception as e:
-        print(f"Buscando... (Error temporal: {e})")
+        print(f"[{time.strftime('%H:%M:%S')}] ⚠️ Error en la búsqueda: {e}", flush=True)
         return []
 
 async def main():
@@ -91,3 +96,4 @@ async def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     asyncio.run(main())
+
