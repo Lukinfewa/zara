@@ -92,8 +92,8 @@ async def main():
                 # Pausa de 10 min para no spamear si ya sabemos que hay stock
                 await asyncio.sleep(600)
             
-            print(f"[{time.strftime('%H:%M:%S')}] ⏳ Pausa de 2 min...", flush=True)
-            await asyncio.sleep(120)
+            print(f"[{time.strftime('%H:%M:%S')}] ⏳ Pausa de 1 min...", flush=True)
+            await asyncio.sleep(60)
             driver.refresh()
 
     except Exception as e:
@@ -104,6 +104,7 @@ async def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     asyncio.run(main())
+
 
 
 
