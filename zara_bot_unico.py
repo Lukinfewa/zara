@@ -5,6 +5,7 @@ from flask import Flask
 from telegram import Bot
 from threading import Thread
 from dotenv import load_dotenv
+
 # ---------------- FLASK ----------------
 app = Flask('')
 
@@ -18,14 +19,16 @@ def run_flask():
 
 # ---------------- CONFIG ----------------
 load_dotenv()
+
 PRODUCT_URL = "https://www.zara.com/es/es/blazer-espiga-con-lana-zw-collection-p03736258.html"
 API_URL = "https://www.zara.com/es/es/products-details?productId=3736258"
 
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_IDS = list(map(int, os.getenv("CHAT_IDS", "").split(',')))
 
-bot = Bot(token=TOKEN)
+CHAT_IDS = os.getenv("CHAT_IDS", "")
+CHAT_IDS = [int(x) for x in CHAT_IDS.split(',') if x.strip()]
+
+bot = Bot(token=TELEGRAM_TOKEN)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -65,7 +68,7 @@ def main():
     print("🚀 Bot Zara iniciado")
     print(f"🔗 {PRODUCT_URL}")
 
-    for cid in IDS:
+    for cid in CHAT_IDS:
         bot.send_message(cid, "🤖 Bot Zara iniciado\nBuscando stock cada 60s")
 
     while True:
@@ -78,7 +81,7 @@ def main():
                 )
 
                 print("📨 Enviando alerta Telegram")
-                for cid in IDS:
+                for cid in CHAT_IDS:
                     bot.send_message(cid, mensaje)
                     time.sleep(1)
 
@@ -95,8 +98,6 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     print("🌐 Flask activo")
-    main()
-
     main()
 
 
