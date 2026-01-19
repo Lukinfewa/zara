@@ -4,7 +4,7 @@ import requests
 from flask import Flask
 from telegram import Bot
 from threading import Thread
-
+from dotenv import load_dotenv
 # ---------------- FLASK ----------------
 app = Flask('')
 
@@ -17,11 +17,13 @@ def run_flask():
     app.run(host='0.0.0.0', port=port)
 
 # ---------------- CONFIG ----------------
+load_dotenv()
 PRODUCT_URL = "https://www.zara.com/es/es/blazer-espiga-con-lana-zw-collection-p03736258.html"
 API_URL = "https://www.zara.com/es/es/products-details?productId=3736258"
 
-TOKEN = os.environ["TELEGRAM_TOKEN"]
-IDS = [5013787175, 7405905501]
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_IDS = list(map(int, os.getenv("CHAT_IDS", "").split(',')))
 
 bot = Bot(token=TOKEN)
 
@@ -96,4 +98,5 @@ if __name__ == "__main__":
     main()
 
     main()
+
 
