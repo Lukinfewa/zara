@@ -29,50 +29,48 @@ def run_flask():
 # ================= CONFIG =================
 load_dotenv()
 
-# 🔗 PRODUCTO CON STOCK (CAMISA)
 PRODUCT_URL = "https://www.zara.com/es/es/camisa-popelin-cruzada-cuadros-p04661003.html"
-
-# ⚠️ ESTE ES EL ID CORRECTO (sale del v1= de la URL)
-API_URL = "https://www.zara.com/es/es/products-details?productId=513818628"
+AVAILABILITY_API = "https://www.zara.com/es/es/availability?productIds=4661003"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_IDS_RAW = os.getenv("CHAT_IDS", "")
+CHAT_IDS = [int(x) for x in os.getenv("CHAT_IDS", "").split(",") if x.strip()]
 
-if not TELEGRAM_TOKEN:
-    raise ValueError("❌ TELEGRAM_TOKEN no definido")
-
-CHAT_IDS = [int(cid.strip()) for cid in CHAT_IDS_RAW.split(",") if cid.strip()]
-if not CHAT_IDS:
-    raise ValueError("❌ CHAT_IDS vacío o mal definido")
+if not TELEGRAM_TOKEN or not CHAT_IDS:
+    raise ValueError("❌ Variables de entorno incompletas")
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
-    "Accept": "application/json"
+    "Accept": "application/json",
+    "Referer": "https://www.zara.com/"
 }
 
 # ================= STOCK CHECK =================
 def hay_stock():
     try:
-        logging.info("🔍 Consultando stock Zara (API real)...")
+        logging.info("🔍 Consultando stock Zara (availability API)...")
 
-        r = requests.get(API_URL, headers=HEADERS, timeout=15)
+        r = requests.get(
+            AVAILABILITY_API,
+            headers=HEADERS,
+            timeout=15
+        )
 
         if r.status_code != 200:
-            logging.warning(f"⚠️ Status Zara: {r.status_code}")
+            logging.warning(f"⚠️ Zara status {r.status_code}")
             return False
 
         data = r.json()
+        skus = data.get("skusAvailability", [])
 
-        for color in data.get("colors", []):
-            for size in color.get("sizes", []):
-                if size.get("availability") == "in_stock":
-                    talla = size.get("name", "Talla")
-                    logging.info(f"✅ HAY STOCK - {talla}")
-                    return True
+        for sku in skus:
+            estado = sku.get("availability")
+            if estado in ("in_stock", "low_on_stock"):
+                logging.info(f"✅ HAY STOCK ({estado})")
+                return True
 
-        logging.info("❌ Sin stock")
+        logging.info("❌ Sin stock real")
         return False
 
     except Exception as e:
@@ -90,35 +88,27 @@ def main():
             "🤖 Bot Zara iniciado\nBuscando stock cada 120 segundos"
         )
 
-    logging.info("🟢 Entrando en el bucle principal")
-
     while True:
-        try:
-            if hay_stock():
-                mensaje = (
-                    "✨ ¡HAY STOCK EN ZARA!\n\n"
-                    f"{PRODUCT_URL}\n\n"
-                    f"🕒 {time.strftime('%H:%M:%S')}"
-                )
+        if hay_stock():
+            mensaje = (
+                "✨ ¡HAY STOCK EN ZARA!\n\n"
+                f"{PRODUCT_URL}\n\n"
+                f"🕒 {time.strftime('%H:%M:%S')}"
+            )
+            for cid in CHAT_IDS:
+                bot.send_message(cid, mensaje)
+                time.sleep(1)
 
-                logging.info("📨 Enviando alerta por Telegram")
-                for cid in CHAT_IDS:
-                    bot.send_message(cid, mensaje)
-                    time.sleep(1)
-
-                # Esperar 5 minutos tras detectar stock
-                time.sleep(300)
-            else:
-                time.sleep(120)
-
-        except Exception as e:
-            logging.error(f"💥 Error en bucle principal: {e}")
-            time.sleep(30)
+            logging.info("⏳ Esperando 5 minutos tras aviso")
+            time.sleep(300)
+        else:
+            time.sleep(120)
 
 # ================= START =================
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
