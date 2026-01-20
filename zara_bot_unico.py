@@ -1,6 +1,7 @@
 import os
 import time
 import re
+import base64
 import logging
 import requests
 from flask import Flask
@@ -34,20 +35,26 @@ PRODUCT_URL = "https://www.zara.com/es/es/camisa-popelin-cruzada-cuadros-p046610
 API_URL = "https://www.zara.com/es/es/products-details?productId=4661003"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_IDS = [int(x) for x in os.getenv("CHAT_IDS", "").split(",") if x.strip()]
+CHAT_IDS = [int(x.strip()) for x in os.getenv("CHAT_IDS", "").split(",") if x.strip()]
 ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
 
-if not TELEGRAM_TOKEN or not CHAT_IDS or not ZYTE_API_KEY:
-    raise ValueError("❌ Variables de entorno incompletas")
+if not TELEGRAM_TOKEN:
+    raise ValueError("❌ TELEGRAM_TOKEN no definido")
+
+if not CHAT_IDS:
+    raise ValueError("❌ CHAT_IDS vacío o mal definido")
+
+if not ZYTE_API_KEY:
+    raise ValueError("❌ ZYTE_API_KEY no definida")
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
 # ================= STOCK CHECK =================
 def hay_stock():
     try:
-        logging.info("🔍 Consultando stock Zara (HTML Zyte)...")
+        logging.info("🔍 Consultando stock Zara (Zyte HTML real)...")
 
-        r = requests.post(
+        response = requests.post(
             "https://api.zyte.com/v1/extract",
             auth=(ZYTE_API_KEY, ""),
             json={
@@ -57,21 +64,24 @@ def hay_stock():
             timeout=40
         )
 
-        if r.status_code != 200:
-            logging.warning(f"⚠️ Zyte status {r.status_code}")
+        if response.status_code != 200:
+            logging.warning(f"⚠️ Zyte status {response.status_code}")
             return False
 
-        html = r.json().get("httpResponseBody")
-        if not html:
-            logging.warning("⚠️ HTML vacío")
+        body_b64 = response.json().get("httpResponseBody")
+        if not body_b64:
+            logging.warning("⚠️ Zyte no devolvió HTML")
             return False
 
-        # Zara marca stock como "availability":"in_stock"
+        # 🔑 DECODIFICAR BASE64
+        html = base64.b64decode(body_b64).decode("utf-8", errors="ignore")
+
+        # Zara marca stock así en el HTML
         if re.search(r'"availability"\s*:\s*"in_stock"', html):
-            logging.info("✅ HAY STOCK REAL")
+            logging.info("✅ HAY STOCK REAL DETECTADO")
             return True
 
-        logging.info("❌ Sin stock")
+        logging.info("❌ Sin stock real")
         return False
 
     except Exception as e:
@@ -84,25 +94,41 @@ def main():
     logging.info(f"🔗 Producto: {PRODUCT_URL}")
 
     for cid in CHAT_IDS:
-        bot.send_message(cid, "🤖 Bot Zara iniciado\nBuscando stock cada 120s")
+        try:
+            bot.send_message(
+                cid,
+                "🤖 Bot Zara iniciado\nBuscando stock cada 120 segundos"
+            )
+        except Exception as e:
+            logging.error(f"❌ Error enviando mensaje inicial: {e}")
 
     while True:
-        if hay_stock():
-            mensaje = f"✨ ¡HAY STOCK EN ZARA!\n\n{PRODUCT_URL}"
-            for cid in CHAT_IDS:
-                bot.send_message(cid, mensaje)
-                time.sleep(1)
-            time.sleep(300)
-        else:
-            time.sleep(120)
+        try:
+            if hay_stock():
+                mensaje = (
+                    "✨ ¡HAY STOCK EN ZARA!\n\n"
+                    f"{PRODUCT_URL}\n\n"
+                    f"🕒 {time.strftime('%H:%M:%S')}"
+                )
+
+                logging.info("📨 Enviando alerta por Telegram")
+                for cid in CHAT_IDS:
+                    bot.send_message(cid, mensaje)
+                    time.sleep(1)
+
+                logging.info("⏳ Esperando 5 minutos tras detección")
+                time.sleep(300)
+            else:
+                time.sleep(120)
+
+        except Exception as e:
+            logging.error(f"💥 Error en bucle principal: {e}")
+            time.sleep(30)
 
 # ================= START =================
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
-
-
-
 
 
 
