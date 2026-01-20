@@ -48,13 +48,17 @@ if not CHAT_IDS:
 bot = Bot(token=TELEGRAM_TOKEN)
 
 HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "es-ES,es;q=0.9",
     "Referer": "https://www.zara.com/es/",
+    "Origin": "https://www.zara.com",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Dest": "empty",
     "Connection": "keep-alive"
 }
+
 
 # ================= STOCK CHECK =================
 def hay_stock():
@@ -139,6 +143,7 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
