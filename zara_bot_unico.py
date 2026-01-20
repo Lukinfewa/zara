@@ -51,39 +51,43 @@ if not CHAT_IDS:
 bot = Bot(token=TELEGRAM_TOKEN)
 
 # ================= STOCK CHECK =================
+
 def hay_stock():
     try:
         logging.info("🔍 Consultando stock Zara (Zyte Extract)...")
 
-        payload = {
-            "url": PRODUCT_URL,
-            "product": True,
-            "browserHtml": True
-        }
-
-        r = requests.post(
-            "https://api.zyte.com/v1/extract",
-            auth=(ZYTE_API_KEY, ""),
-            json=payload,
-            timeout=40
-        )
-
-        if r.status_code != 200:
-            logging.warning(f"⚠️ Zyte status {r.status_code}")
+        ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
+        if not ZYTE_API_KEY:
+            logging.error("❌ ZYTE_API_KEY no definida")
             return False
 
-        data = r.json()
+        response = requests.post(
+            "https://api.zyte.com/v1/extract",
+            auth=(ZYTE_API_KEY, ""),
+            json={
+                "url": API_URL,
+                "product": True
+            },
+            timeout=30
+        )
+
+        if response.status_code != 200:
+            logging.warning(f"⚠️ Zyte status {response.status_code}")
+            return False
+
+        data = response.json()
 
         product = data.get("product")
         if not product:
-            logging.warning("⚠️ Zyte no devolvió datos de producto")
+            logging.warning("⚠️ Producto no encontrado en respuesta")
             return False
 
-        # 🔎 Aquí Zara es caprichosa: el stock suele venir en availability / offers
-        offers = product.get("offers", [])
-        for offer in offers:
-            if offer.get("availability") == "InStock":
-                logging.info("✅ HAY STOCK (Zyte Product)")
+        variants = product.get("variants", [])
+
+        for v in variants:
+            availability = v.get("availability", {})
+            if availability.get("available") is True:
+                logging.info(f"✅ HAY STOCK - Talla {v.get('size')}")
                 return True
 
         logging.info("❌ Sin stock")
@@ -133,6 +137,7 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
