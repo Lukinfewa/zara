@@ -1,7 +1,9 @@
 import os
 import time
-import requests
+import json
+import re
 import logging
+import requests
 from flask import Flask
 from telegram import Bot
 from threading import Thread
@@ -34,64 +36,69 @@ API_URL = "https://www.zara.com/es/es/products-details?productId=3736258"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_IDS_RAW = os.getenv("CHAT_IDS", "")
+ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
 
 if not TELEGRAM_TOKEN:
-    logging.error("❌ TELEGRAM_TOKEN no definido")
-    raise ValueError("Falta TELEGRAM_TOKEN")
+    raise ValueError("❌ TELEGRAM_TOKEN no definido")
+
+if not ZYTE_API_KEY:
+    raise ValueError("❌ ZYTE_API_KEY no definida")
 
 CHAT_IDS = [int(cid.strip()) for cid in CHAT_IDS_RAW.split(",") if cid.strip()]
-
 if not CHAT_IDS:
-    logging.error("❌ CHAT_IDS vacío o mal definido")
-    raise ValueError("CHAT_IDS incorrecto")
+    raise ValueError("❌ CHAT_IDS vacío o mal definido")
 
 bot = Bot(token=TELEGRAM_TOKEN)
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "es-ES,es;q=0.9",
-    "Referer": "https://www.zara.com/es/",
-    "Origin": "https://www.zara.com",
-    "Sec-Fetch-Site": "same-origin",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Dest": "empty",
-    "Connection": "keep-alive"
-}
-
 
 # ================= STOCK CHECK =================
 def hay_stock():
     try:
-        logging.info("🔍 Consultando stock Zara...")
+        logging.info("🔍 Consultando stock Zara (Zyte)...")
 
-        ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
-        if not ZYTE_API_KEY:
-            logging.error("❌ ZYTE_API_KEY no definida")
-            return False
+        payload = {
+            "url": API_URL,
+            "browserHtml": True,
+            "httpResponseBody": True
+        }
 
-    proxies = {
-    "http": f"http://{ZYTE_API_KEY}:@proxy.zyte.com:8011",
-    "https": f"http://{ZYTE_API_KEY}:@proxy.zyte.com:8011",
-}
-
-
-        r = requests.get(
-            API_URL,
-            headers=HEADERS,
-            proxies=proxies,
-            timeout=20
+        r = requests.post(
+            "https://api.zyte.com/v1/extract",
+            auth=(ZYTE_API_KEY, ""),
+            json=payload,
+            timeout=40
         )
 
-        logging.info(f"🌐 Status Zara: {r.status_code}")
-
         if r.status_code != 200:
-            logging.warning(f"⚠️ Respuesta Zara: {r.status_code}")
+            logging.warning(f"⚠️ Zyte status {r.status_code}")
             return False
 
-        data = r.json()
+        html = r.json().get("httpResponseBody")
+        if not html:
+            logging.warning("⚠️ HTML vacío")
+            return False
 
-        for color in data.get("colors", []):
+        match = re.search(
+            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+            html,
+            re.DOTALL
+        )
+
+        if not match:
+            logging.warning("❌ No se encontró __NEXT_DATA__")
+            return False
+
+        data = json.loads(match.group(1))
+
+        colors = (
+            data
+            .get("props", {})
+            .get("pageProps", {})
+            .get("product", {})
+            .get("detail", {})
+            .get("colors", [])
+        )
+
+        for color in colors:
             for size in color.get("sizes", []):
                 if size.get("availability") == "in_stock":
                     logging.info("✅ HAY STOCK")
@@ -110,13 +117,10 @@ def main():
     logging.info(f"🔗 Producto: {PRODUCT_URL}")
 
     for cid in CHAT_IDS:
-        try:
-            bot.send_message(
-                cid,
-                "🤖 Bot Zara iniciado\nBuscando stock cada 60 segundos"
-            )
-        except Exception as e:
-            logging.error(f"❌ Error enviando mensaje inicial a {cid}: {e}")
+        bot.send_message(
+            cid,
+            "🤖 Bot Zara iniciado\nBuscando stock cada 120 segundos"
+        )
 
     logging.info("🟢 Entrando en el bucle principal")
 
@@ -134,10 +138,10 @@ def main():
                     bot.send_message(cid, mensaje)
                     time.sleep(1)
 
-                logging.info("⏳ Esperando 5 minutos tras detección de stock")
+                logging.info("⏳ Esperando 5 minutos tras detección")
                 time.sleep(300)
             else:
-                time.sleep(60)
+                time.sleep(120)
 
         except Exception as e:
             logging.error(f"💥 Error en bucle principal: {e}")
@@ -147,6 +151,7 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
