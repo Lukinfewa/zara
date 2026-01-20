@@ -31,8 +31,8 @@ def run_flask():
 # ================= CONFIG =================
 load_dotenv()
 
-PRODUCT_URL = "https://www.zara.com/es/es/blazer-espiga-con-lana-zw-collection-p03736258.html"
-API_URL = "https://www.zara.com/es/es/products-details?productId=3736258"
+PRODUCT_URL = "https://www.zara.com/es/es/camisa-popelin-cruzada-cuadros-p04661003.html?v1=513818628&v2=2420369"
+API_URL = "https://www.zara.com/es/es/products-details?productId=04661003"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_IDS_RAW = os.getenv("CHAT_IDS", "")
@@ -133,6 +133,7 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
