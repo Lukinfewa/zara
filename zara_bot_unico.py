@@ -70,10 +70,11 @@ def hay_stock():
             logging.error("❌ ZYTE_API_KEY no definida")
             return False
 
-        proxies = {
-            "http": f"http://apikey:{ZYTE_API_KEY}@proxy.zyte.com:8011",
-            "https": f"http://apikey:{ZYTE_API_KEY}@proxy.zyte.com:8011",
-        }
+    proxies = {
+    "http": f"http://{ZYTE_API_KEY}:@proxy.zyte.com:8011",
+    "https": f"http://{ZYTE_API_KEY}:@proxy.zyte.com:8011",
+}
+
 
         r = requests.get(
             API_URL,
@@ -146,6 +147,7 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
