@@ -1,7 +1,5 @@
 import os
 import time
-import re
-import base64
 import logging
 import requests
 from flask import Flask
@@ -31,57 +29,50 @@ def run_flask():
 # ================= CONFIG =================
 load_dotenv()
 
+# 🔗 PRODUCTO CON STOCK (CAMISA)
 PRODUCT_URL = "https://www.zara.com/es/es/camisa-popelin-cruzada-cuadros-p04661003.html"
-API_URL = "https://www.zara.com/es/es/products-details?productId=4661003"
+
+# ⚠️ ESTE ES EL ID CORRECTO (sale del v1= de la URL)
+API_URL = "https://www.zara.com/es/es/products-details?productId=513818628"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_IDS = [int(x.strip()) for x in os.getenv("CHAT_IDS", "").split(",") if x.strip()]
-ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
+CHAT_IDS_RAW = os.getenv("CHAT_IDS", "")
 
 if not TELEGRAM_TOKEN:
     raise ValueError("❌ TELEGRAM_TOKEN no definido")
 
+CHAT_IDS = [int(cid.strip()) for cid in CHAT_IDS_RAW.split(",") if cid.strip()]
 if not CHAT_IDS:
     raise ValueError("❌ CHAT_IDS vacío o mal definido")
 
-if not ZYTE_API_KEY:
-    raise ValueError("❌ ZYTE_API_KEY no definida")
-
 bot = Bot(token=TELEGRAM_TOKEN)
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0",
+    "Accept": "application/json"
+}
 
 # ================= STOCK CHECK =================
 def hay_stock():
     try:
-        logging.info("🔍 Consultando stock Zara (Zyte HTML real)...")
+        logging.info("🔍 Consultando stock Zara (API real)...")
 
-        response = requests.post(
-            "https://api.zyte.com/v1/extract",
-            auth=(ZYTE_API_KEY, ""),
-            json={
-                "url": API_URL,
-                "httpResponseBody": True
-            },
-            timeout=40
-        )
+        r = requests.get(API_URL, headers=HEADERS, timeout=15)
 
-        if response.status_code != 200:
-            logging.warning(f"⚠️ Zyte status {response.status_code}")
+        if r.status_code != 200:
+            logging.warning(f"⚠️ Status Zara: {r.status_code}")
             return False
 
-        body_b64 = response.json().get("httpResponseBody")
-        if not body_b64:
-            logging.warning("⚠️ Zyte no devolvió HTML")
-            return False
+        data = r.json()
 
-        # 🔑 DECODIFICAR BASE64
-        html = base64.b64decode(body_b64).decode("utf-8", errors="ignore")
+        for color in data.get("colors", []):
+            for size in color.get("sizes", []):
+                if size.get("availability") == "in_stock":
+                    talla = size.get("name", "Talla")
+                    logging.info(f"✅ HAY STOCK - {talla}")
+                    return True
 
-        # Zara marca stock así en el HTML
-        if re.search(r'"availability"\s*:\s*"in_stock"', html):
-            logging.info("✅ HAY STOCK REAL DETECTADO")
-            return True
-
-        logging.info("❌ Sin stock real")
+        logging.info("❌ Sin stock")
         return False
 
     except Exception as e:
@@ -94,13 +85,12 @@ def main():
     logging.info(f"🔗 Producto: {PRODUCT_URL}")
 
     for cid in CHAT_IDS:
-        try:
-            bot.send_message(
-                cid,
-                "🤖 Bot Zara iniciado\nBuscando stock cada 120 segundos"
-            )
-        except Exception as e:
-            logging.error(f"❌ Error enviando mensaje inicial: {e}")
+        bot.send_message(
+            cid,
+            "🤖 Bot Zara iniciado\nBuscando stock cada 120 segundos"
+        )
+
+    logging.info("🟢 Entrando en el bucle principal")
 
     while True:
         try:
@@ -116,7 +106,7 @@ def main():
                     bot.send_message(cid, mensaje)
                     time.sleep(1)
 
-                logging.info("⏳ Esperando 5 minutos tras detección")
+                # Esperar 5 minutos tras detectar stock
                 time.sleep(300)
             else:
                 time.sleep(120)
