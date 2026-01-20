@@ -53,12 +53,12 @@ bot = Bot(token=TELEGRAM_TOKEN)
 # ================= STOCK CHECK =================
 def hay_stock():
     try:
-        logging.info("🔍 Consultando stock Zara (Zyte)...")
+        logging.info("🔍 Consultando stock Zara (Zyte Extract)...")
 
         payload = {
-            "url": API_URL,
-            "browserHtml": True,
-            "httpResponseBody": True
+            "url": PRODUCT_URL,
+            "product": True,
+            "browserHtml": True
         }
 
         r = requests.post(
@@ -72,37 +72,19 @@ def hay_stock():
             logging.warning(f"⚠️ Zyte status {r.status_code}")
             return False
 
-        html = r.json().get("httpResponseBody")
-        if not html:
-            logging.warning("⚠️ HTML vacío")
+        data = r.json()
+
+        product = data.get("product")
+        if not product:
+            logging.warning("⚠️ Zyte no devolvió datos de producto")
             return False
 
-        match = re.search(
-            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
-            html,
-            re.DOTALL
-        )
-
-        if not match:
-            logging.warning("❌ No se encontró __NEXT_DATA__")
-            return False
-
-        data = json.loads(match.group(1))
-
-        colors = (
-            data
-            .get("props", {})
-            .get("pageProps", {})
-            .get("product", {})
-            .get("detail", {})
-            .get("colors", [])
-        )
-
-        for color in colors:
-            for size in color.get("sizes", []):
-                if size.get("availability") == "in_stock":
-                    logging.info("✅ HAY STOCK")
-                    return True
+        # 🔎 Aquí Zara es caprichosa: el stock suele venir en availability / offers
+        offers = product.get("offers", [])
+        for offer in offers:
+            if offer.get("availability") == "InStock":
+                logging.info("✅ HAY STOCK (Zyte Product)")
+                return True
 
         logging.info("❌ Sin stock")
         return False
@@ -151,6 +133,7 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
