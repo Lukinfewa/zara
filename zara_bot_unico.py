@@ -63,9 +63,12 @@ HEADERS = {
 # ================= STOCK CHECK =================
 def hay_stock():
     try:
-        print(f"[{time.strftime('%H:%M:%S')}] 🔍 Consultando stock Zara...")
+        logging.info("🔍 Consultando stock Zara...")
 
         ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
+        if not ZYTE_API_KEY:
+            logging.error("❌ ZYTE_API_KEY no definida")
+            return False
 
         proxies = {
             "http": f"http://apikey:{ZYTE_API_KEY}@proxy.zyte.com:8011",
@@ -79,10 +82,10 @@ def hay_stock():
             timeout=20
         )
 
-        print(f"🌐 Status Zara: {r.status_code}")
+        logging.info(f"🌐 Status Zara: {r.status_code}")
 
         if r.status_code != 200:
-            print(f"⚠️ Respuesta Zara: {r.status_code}")
+            logging.warning(f"⚠️ Respuesta Zara: {r.status_code}")
             return False
 
         data = r.json()
@@ -90,14 +93,14 @@ def hay_stock():
         for color in data.get("colors", []):
             for size in color.get("sizes", []):
                 if size.get("availability") == "in_stock":
-                    print("✅ HAY STOCK")
+                    logging.info("✅ HAY STOCK")
                     return True
 
-        print("❌ Sin stock")
+        logging.info("❌ Sin stock")
         return False
 
     except Exception as e:
-        print(f"💥 Error stock: {e}")
+        logging.error(f"💥 Error stock: {e}")
         return False
 
 # ================= MAIN LOOP =================
@@ -143,6 +146,7 @@ def main():
 if __name__ == "__main__":
     Thread(target=run_flask, daemon=True).start()
     main()
+
 
 
 
